@@ -5,6 +5,255 @@
 
 
 /*////////////////////////////////////////
+* Nazwa pliku: minimalizacja.hpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#ifndef MINIMALIZACJA_HPP
+#define MINIMALIZACJA_HPP
+
+
+#include <vector>
+#include <string>
+#include "kostka.hpp"
+#include "generowanie_implikantow_prostych.hpp" // definicja TablicaImplikantowProstych
+#include "redukcja_tablicy.hpp"
+#include "wypisywanie_wynikow.hpp"
+
+
+class Minimalizacja
+{
+public:
+    using PokrycieKolumnowe = std::vector<std::size_t>;
+
+    // przekazanie nazw wejsc
+    void ustaw_nazwy_wejsc(const std::vector<std::string>& nazwy);
+    // przekazanie nazw wyjsc
+    void ustaw_nazwy_wyjsc(const std::vector<std::string>& nazwy);
+    std::string get_nazwa_wyjscia(const unsigned int& numer);
+
+    // glowna logika (przekierowana GenerowanieImplikantowProstych)
+    TablicaImplikantowProstych wyznacz_tablice_implikantow_prostych(
+        const ZbiorKostek& F,
+        const ZbiorKostek& R
+    );
+
+    // glowna logika (przekierowana do RedukcjaTablicy)
+    PokrycieKolumnowe wyznacz_minimalny_zbior_implikantow(
+        const TablicaImplikantowProstych& tab
+    );
+
+    // glowna logika (przekierowana WypisywanieWynikow)
+    void zapisz_formule(
+        const TablicaImplikantowProstych& tab,
+        const PokrycieKolumnowe& minimalny_zbior,
+        const std::string& nazwa_wyjscia
+    ) const;
+
+private:
+    std::vector<std::string> nazwy_wejsc;
+    std::vector<std::string> nazwy_wyjsc;
+
+    GenerowanieImplikantowProstych generator;
+    RedukcjaTablicy reduktor;
+    WypisywanieWynikow pisanie;
+};
+
+
+#endif
+
+
+
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: minimalizacja.cpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#include "minimalizacja.hpp"
+
+
+void Minimalizacja::ustaw_nazwy_wejsc(const std::vector<std::string>& nazwy)
+{
+    nazwy_wejsc = nazwy;
+}
+
+
+void Minimalizacja::ustaw_nazwy_wyjsc(const std::vector<std::string>& nazwy)
+{
+    nazwy_wyjsc = nazwy;
+}
+
+
+std::string Minimalizacja::get_nazwa_wyjscia(const unsigned int& numer)
+{
+    if (numer < nazwy_wyjsc.size())
+        return nazwy_wyjsc[numer];
+    return "";
+}
+
+
+TablicaImplikantowProstych Minimalizacja::wyznacz_tablice_implikantow_prostych(
+    const ZbiorKostek& F,
+    const ZbiorKostek& R
+) {
+    return generator.wyznacz_tablice_implikantow_prostych(F, R, nazwy_wejsc);
+}
+
+
+Minimalizacja::PokrycieKolumnowe Minimalizacja::wyznacz_minimalny_zbior_implikantow(
+    const TablicaImplikantowProstych& tab
+) {
+    return reduktor.wyznacz_minimalny_zbior_implikantow(tab);
+}
+
+
+void Minimalizacja::zapisz_formule(
+    const TablicaImplikantowProstych& tab,
+    const PokrycieKolumnowe& minimalny_zbior,
+    const std::string& nazwa_wyjscia
+) const {
+    pisanie.zapisz_formule(tab, minimalny_zbior, nazwa_wyjscia, nazwy_wejsc);
+}
+
+
+
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: wypisywanie_wynikow.hpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#ifndef WYPISYWANIE_WYNIKOW_HPP
+#define WYPISYWANIE_WYNIKOW_HPP
+
+
+#include <string>
+#include <vector>
+#include "generowanie_implikantow_prostych.hpp" // TablicaImplikantowProstych
+
+
+class WypisywanieWynikow
+{
+public:
+    using PokrycieKolumnowe = std::vector<std::size_t>;
+
+    void zapisz_formule(
+        const TablicaImplikantowProstych& tab,
+        const PokrycieKolumnowe& minimalny_zbior,
+        const std::string& nazwa_wyjscia,
+        const std::vector<std::string>& nazwy_wejsc
+    ) const;
+};
+
+
+#endif
+
+
+
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: wypisywanie_wynikow.cpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#include "wypisywanie_wynikow.hpp"
+#include "logger.hpp"
+#include "konfiguracja.hpp"
+#include <iostream>
+#include <sstream>
+
+
+void WypisywanieWynikow::zapisz_formule(
+    const TablicaImplikantowProstych& tab,
+    const PokrycieKolumnowe& minimalny_zbior,
+    const std::string& nazwa_wyjscia,
+    const std::vector<std::string>& nazwy_wejsc
+) const {
+    if (minimalny_zbior.empty())
+    {
+        std::string komunikat = "Brak implikantów w minimalnym zbiorze dla wyjścia " + nazwa_wyjscia;
+        std::cout << komunikat << std::endl;
+#if WLACZ_LOGGER_POKRYC
+        Logger::info(komunikat);
+#endif
+        return;
+    }
+
+    {
+        std::ostringstream oss;
+        oss << nazwa_wyjscia << " = ";
+        for (std::size_t idx = 0; idx < minimalny_zbior.size(); ++idx)
+        {
+            oss << "I" << minimalny_zbior[idx];
+            if (idx + 1 < minimalny_zbior.size()) oss << " + ";
+        }
+        const std::string linia = oss.str();
+        std::cout << linia << std::endl;
+#if WLACZ_LOGGER_POKRYC
+        Logger::info(linia);
+#endif
+    }
+
+    {
+        std::ostringstream oss;
+        oss << nazwa_wyjscia << " = ";
+
+        const auto& PI = tab.implikanty_proste;
+        bool pierwszy_termin = true;
+        for (std::size_t t = 0; t < minimalny_zbior.size(); ++t)
+        {
+            std::size_t kol = minimalny_zbior[t];
+            if (kol >= PI.size()) continue;
+
+            const std::string wartosc = PI[kol].pobierz_wartosc();
+            std::ostringstream term;
+            bool pierwszy_literal = true;
+            for (std::size_t bit = 0; bit < wartosc.size(); ++bit)
+            {
+                char c = wartosc[bit];
+                if (c == '-') continue;
+                if (!pierwszy_literal) term << " * ";
+                if (c == '0') term << "~";
+                if (!nazwy_wejsc.empty() && bit < nazwy_wejsc.size())
+                    term << nazwy_wejsc[bit];
+                else
+                    term << "x" << (bit + 1);
+                pierwszy_literal = false;
+            }
+
+            std::string termStr = term.str();
+            if (termStr.empty()) termStr = "1";
+
+            if (!pierwszy_termin) oss << " + ";
+            oss << "(" << termStr << ")";
+            pierwszy_termin = false;
+        }
+
+        const std::string linia = oss.str();
+        std::cout << linia << std::endl;
+#if WLACZ_LOGGER_POKRYC
+        Logger::info(linia);
+#endif
+    }
+}
+
+
+
+
+
+/*////////////////////////////////////////
 * Nazwa pliku: redukcja_tablicy.hpp
 * Projekt:     MSL - Ekspansja
 * Autor:       Dominik Majak
