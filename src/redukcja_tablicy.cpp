@@ -96,7 +96,8 @@ RedukcjaTablicy::PokrycieKolumnowe RedukcjaTablicy::wyznacz_minimalny_zbior_impl
         {
             bool znaleziono_poziom = false;
             aktualne_pokrycie.clear();
-            szukajPokryc.dfs_minimalne_pokrycia(
+            // szukajPokryc.dfs_minimalne_pokrycia(
+            szukaniePokryc.dfs_minimalne_pokrycia(
                 macierz_zredukowana,
                 liczba_kolumn_zredukowanych,
                 aktualne_pokrycie,
