@@ -1,4 +1,269 @@
+/*////////////////////////////////////////
+* Nazwa pliku: main.cpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
 
+
+#include <fstream>
+#include <string>
+#include <iostream>
+#include <chrono>
+#include <sstream>
+
+#include "pla_parser.hpp"
+#include "minimalizacja.hpp"
+#include "logger.hpp"
+#include "konfiguracja.hpp"
+
+
+int main(void)
+{
+    using std::chrono::microseconds;
+    Logger::inicjalizuj(SCIEZKA_LOGGER, true); 
+
+    PlaParser parser(SCIEZKA_DANE_WEJSCIOWE);
+    s_pla_dane dane;
+
+    if (!parser.wczytaj_dane(dane))
+    {
+        Logger::info("BŁĄD: Nie wczytano pliku wejściowego.");
+        Logger::close();
+        return 1;
+    }
+
+    ZbiorKostek F, R;
+    for (std::size_t i = 0; i < dane.kostki_wejsciowe.rozmiar(); ++i)
+    {
+        if (dane.wartosci_wyjsc[i] == "1")  F.dodaj_kostke(dane.kostki_wejsciowe[i]);
+        else                                R.dodaj_kostke(dane.kostki_wejsciowe[i]);
+    }
+
+    Logger::info("Liczba kostek w F: " + std::to_string(F.rozmiar()));
+    Logger::info("Liczba kostek w R: " + std::to_string(R.rozmiar()));
+
+    Minimalizacja minimalizacja;
+    minimalizacja.ustaw_nazwy_wejsc(dane.nazwy_wejsc);
+    minimalizacja.ustaw_nazwy_wyjsc(dane.nazwy_wyjsc);
+
+    auto czas_start = std::chrono::system_clock::now();
+    
+    auto tablica_ip = minimalizacja.wyznacz_tablice_implikantow_prostych(F, R);
+    
+    auto minimalny_zbior = minimalizacja.wyznacz_minimalny_zbior_implikantow(tablica_ip);
+    
+    std::string nazwa_wyjscia = minimalizacja.get_nazwa_wyjscia(0);
+    if (!dane.nazwy_wyjsc.empty())
+    {
+        nazwa_wyjscia = dane.nazwy_wyjsc[0];
+    }
+
+    minimalizacja.zapisz_formule(tablica_ip, minimalny_zbior, nazwa_wyjscia);
+    auto czas_stop = std::chrono::system_clock::now();
+    auto czas_pomiar = std::chrono::duration_cast<microseconds>(czas_stop - czas_start).count();
+
+    std::ostringstream oss;
+    oss << "Zmierzony czas: " << czas_pomiar << " us.";
+    Logger::info(oss.str());
+    Logger::close();
+
+    return 0;
+}
+
+
+
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: szukanie_pokryc.hpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#ifndef SZUKANIE_POKRYC_HPP
+#define SZUKANIE_POKRYC_HPP
+
+
+#include <vector>
+#include <cstddef>
+
+
+class SzukaniePokryc
+{
+public:
+    using MacierzBlokujaca = std::vector<std::vector<bool>>;
+    using PokrycieKolumnowe = std::vector<std::size_t>;
+
+    // metody dla ekspansji
+    bool czy_jest_pokryciem(const MacierzBlokujaca& B, const PokrycieKolumnowe& kolumny) const;
+    std::vector<PokrycieKolumnowe> znajdz_wszystkie_minimalne_pokrycia_kolumnowe(const MacierzBlokujaca& B);
+
+    // metody dla redukcji tabeli
+    bool czy_pokrywa(const std::vector<std::vector<bool>>& M, const PokrycieKolumnowe& cols);
+    
+    void dfs_minimalne_pokrycia(
+        const std::vector<std::vector<bool>>& macierz_zredukowana,
+        std::size_t liczba_kolumn_zredukowanych,
+        PokrycieKolumnowe& aktualne_pokrycie,
+        std::vector<PokrycieKolumnowe>& minimalne_pokrycia,
+        std::size_t poczatek,
+        std::size_t pozostalo,
+        bool& znaleziono_poziom
+    );
+
+private:
+    void szukaj_pokrycia(
+        const MacierzBlokujaca& B,
+        std::vector<PokrycieKolumnowe>& pokrycia,
+        PokrycieKolumnowe& aktualny,
+        std::size_t liczba_kolumn,
+        std::size_t start,
+        std::size_t pozostalo,
+        bool& czy_znaleziono
+    );
+};
+
+
+#endif
+
+
+
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: szukanie_pokryc.cpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#include "szukanie_pokryc.hpp"
+
+
+bool SzukaniePokryc::czy_jest_pokryciem(const MacierzBlokujaca& B, const PokrycieKolumnowe& kolumny) const
+{
+    const std::size_t liczba_wierszy = B.size();
+    if (liczba_wierszy == 0) return true;
+
+    for (std::size_t i = 0; i < liczba_wierszy; ++i)
+    {
+        bool pokryty = false;
+        const std::size_t liczba_kolumn_w_wierszu = B[i].size();
+        for (std::size_t j = 0; j < kolumny.size(); ++j)
+        {
+            std::size_t k = kolumny[j];
+            if (k >= liczba_kolumn_w_wierszu) continue;
+            if (B[i][k]) { pokryty = true; break; }
+        }
+        if (!pokryty) return false;
+    }
+    return true;
+}
+
+
+void SzukaniePokryc::szukaj_pokrycia(
+    const MacierzBlokujaca& B,
+    std::vector<PokrycieKolumnowe>& pokrycia,
+    PokrycieKolumnowe& aktualny,
+    std::size_t liczba_kolumn,
+    std::size_t start,
+    std::size_t pozostalo,
+    bool& czy_znaleziono
+) {
+    if (pozostalo == 0)
+    {
+        if (czy_jest_pokryciem(B, aktualny))
+        {
+            pokrycia.push_back(aktualny);
+            czy_znaleziono = true;
+        }
+        return;
+    }
+    if (start >= liczba_kolumn) return;
+
+    for (std::size_t j = start; j <= liczba_kolumn - pozostalo; ++j)
+    {
+        aktualny.push_back(j);
+        szukaj_pokrycia(B, pokrycia, aktualny, liczba_kolumn, j + 1, pozostalo - 1, czy_znaleziono);
+        aktualny.pop_back();
+    }
+}
+
+
+std::vector<SzukaniePokryc::PokrycieKolumnowe> SzukaniePokryc::znajdz_wszystkie_minimalne_pokrycia_kolumnowe(const MacierzBlokujaca& B)
+{
+    std::vector<PokrycieKolumnowe> pokrycia;
+    const std::size_t liczba_wierszy = B.size();
+    if (liczba_wierszy == 0) return pokrycia;
+    const std::size_t liczba_kolumn = B[0].size();
+    if (liczba_kolumn == 0) return pokrycia;
+
+    for (std::size_t i = 0; i < liczba_wierszy; ++i)
+    {
+        bool czy_ma_jedynke = false;
+        for (bool b : B[i]) if (b) { czy_ma_jedynke = true; break; }
+        if (!czy_ma_jedynke) return pokrycia;
+    }
+
+    PokrycieKolumnowe aktualny;
+    for (std::size_t k = 1; k <= liczba_kolumn; ++k)
+    {
+        bool czy_znaleziono = false;
+        aktualny.clear();
+        szukaj_pokrycia(B, pokrycia, aktualny, liczba_kolumn, 0, k, czy_znaleziono);
+        if (czy_znaleziono) break;
+    }
+    return pokrycia;
+}
+
+
+bool SzukaniePokryc::czy_pokrywa(const std::vector<std::vector<bool>>& M, const PokrycieKolumnowe& cols)
+{
+    const std::size_t rows = M.size();
+    if (rows == 0) return true;
+    for (std::size_t i = 0; i < rows; ++i)
+    {
+        bool covered = false;
+        const std::size_t row_len = M[i].size();
+        for (std::size_t k = 0; k < cols.size(); ++k)
+        {
+            std::size_t j = cols[k];
+            if (j < row_len && M[i][j]) { covered = true; break; }
+        }
+        if (!covered) return false;
+    }
+    return true;
+}
+
+
+void SzukaniePokryc::dfs_minimalne_pokrycia(
+    const std::vector<std::vector<bool>>& macierz_zredukowana,
+    std::size_t liczba_kolumn_zredukowanych,
+    PokrycieKolumnowe& aktualne_pokrycie,
+    std::vector<PokrycieKolumnowe>& minimalne_pokrycia,
+    std::size_t poczatek,
+    std::size_t pozostalo,
+    bool& znaleziono_poziom
+) {
+    if (pozostalo == 0)
+    {
+        if (czy_pokrywa(macierz_zredukowana, aktualne_pokrycie))
+        {
+            minimalne_pokrycia.push_back(aktualne_pokrycie);
+            znaleziono_poziom = true;
+        }
+        return;
+    }
+    if (poczatek >= liczba_kolumn_zredukowanych) return;
+
+    for (std::size_t j = poczatek; j <= liczba_kolumn_zredukowanych - pozostalo; ++j)
+    {
+        aktualne_pokrycie.push_back(j);
+        dfs_minimalne_pokrycia(macierz_zredukowana, liczba_kolumn_zredukowanych, aktualne_pokrycie, minimalne_pokrycia, j + 1, pozostalo - 1, znaleziono_poziom);
+        aktualne_pokrycie.pop_back();
+    }
+}
 
 
 
