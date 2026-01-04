@@ -66,7 +66,7 @@ bool PlaParser::wczytaj_dane (
         }
         else if (klucz == ".p")
         {
-            // ignoruj liczbe kostek
+        
         }
         else if (klucz == ".e")
         {

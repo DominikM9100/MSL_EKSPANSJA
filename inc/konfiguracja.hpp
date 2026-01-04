@@ -10,7 +10,7 @@
 
 
 // sciezki
-#define SCIEZKA_DANE_WEJSCIOWE                  "dane/dane_wejsciowe_1.txt"
+#define SCIEZKA_DANE_WEJSCIOWE                  "dane/dane_wejsciowe_0.txt"
 #define SCIEZKA_LOGGER                          "log/log_przetwarzanie.txt"
 
 // flagi Loggera

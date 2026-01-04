@@ -19,223 +19,133 @@
 
 int main(void)
 {
-    using std::chrono::microseconds;
-    Logger::inicjalizuj(SCIEZKA_LOGGER, true); 
+  using std::chrono::microseconds;
+  Logger::inicjalizuj(SCIEZKA_LOGGER, true); 
 
-    PlaParser parser(SCIEZKA_DANE_WEJSCIOWE);
-    s_pla_dane dane;
+  PlaParser parser(SCIEZKA_DANE_WEJSCIOWE);
+  s_pla_dane dane;
 
-    if (!parser.wczytaj_dane(dane))
-    {
-        Logger::info("BŁĄD: Nie wczytano pliku wejściowego.");
-        Logger::close();
-        return 1;
-    }
-
-    ZbiorKostek F, R;
-    for (std::size_t i = 0; i < dane.kostki_wejsciowe.rozmiar(); ++i)
-    {
-        if (dane.wartosci_wyjsc[i] == "1")  F.dodaj_kostke(dane.kostki_wejsciowe[i]);
-        else                                R.dodaj_kostke(dane.kostki_wejsciowe[i]);
-    }
-
-    Logger::info("Liczba kostek w F: " + std::to_string(F.rozmiar()));
-    Logger::info("Liczba kostek w R: " + std::to_string(R.rozmiar()));
-
-    Minimalizacja minimalizacja;
-    minimalizacja.ustaw_nazwy_wejsc(dane.nazwy_wejsc);
-    minimalizacja.ustaw_nazwy_wyjsc(dane.nazwy_wyjsc);
-
-    auto czas_start = std::chrono::system_clock::now();
-    
-    auto tablica_ip = minimalizacja.wyznacz_tablice_implikantow_prostych(F, R);
-    
-    auto minimalny_zbior = minimalizacja.wyznacz_minimalny_zbior_implikantow(tablica_ip);
-    
-    std::string nazwa_wyjscia = minimalizacja.get_nazwa_wyjscia(0);
-    if (!dane.nazwy_wyjsc.empty())
-    {
-        nazwa_wyjscia = dane.nazwy_wyjsc[0];
-    }
-
-    minimalizacja.zapisz_formule(tablica_ip, minimalny_zbior, nazwa_wyjscia);
-    auto czas_stop = std::chrono::system_clock::now();
-    auto czas_pomiar = std::chrono::duration_cast<microseconds>(czas_stop - czas_start).count();
-
-    std::ostringstream oss;
-    oss << "Zmierzony czas: " << czas_pomiar << " us.";
-    Logger::info(oss.str());
+  if (!parser.wczytaj_dane(dane))
+  {
+    Logger::info("BŁĄD: Nie wczytano pliku wejściowego.");
     Logger::close();
+    return 1;
+  }
 
-    return 0;
+  ZbiorKostek F, R;
+  for (std::size_t i = 0; i < dane.kostki_wejsciowe.rozmiar(); ++i)
+  {
+    if (dane.wartosci_wyjsc[i] == "1")  F.dodaj_kostke(dane.kostki_wejsciowe[i]);
+    else                                R.dodaj_kostke(dane.kostki_wejsciowe[i]);
+  }
+
+  Logger::info("Liczba kostek w F: " + std::to_string(F.rozmiar()));
+  Logger::info("Liczba kostek w R: " + std::to_string(R.rozmiar()));
+
+  Minimalizacja minimalizacja;
+  minimalizacja.ustaw_nazwy_wejsc(dane.nazwy_wejsc);
+  minimalizacja.ustaw_nazwy_wyjsc(dane.nazwy_wyjsc);
+
+  auto czas_start = std::chrono::system_clock::now();
+
+  auto tablica_ip = minimalizacja.wyznacz_tablice_implikantow_prostych(F, R);
+
+  auto minimalny_zbior = minimalizacja.wyznacz_minimalny_zbior_implikantow(tablica_ip);
+
+  std::string nazwa_wyjscia = minimalizacja.get_nazwa_wyjscia(0);
+  if (!dane.nazwy_wyjsc.empty())
+  {
+    nazwa_wyjscia = dane.nazwy_wyjsc[0];
+  }
+
+  minimalizacja.zapisz_formule(tablica_ip, minimalny_zbior, nazwa_wyjscia);
+  auto czas_stop = std::chrono::system_clock::now();
+  auto czas_pomiar = std::chrono::duration_cast<microseconds>(czas_stop - czas_start).count();
+
+  std::ostringstream oss;
+  oss << "Zmierzony czas: " << czas_pomiar << " us.";
+  Logger::info(oss.str());
+  Logger::close();
+
+  return 0;
 }
 
 
-
-
-
 /*////////////////////////////////////////
-* Nazwa pliku: pla_parser.hpp
+* Nazwa pliku: konfiguracja.hpp
 * Projekt:     MSL - Ekspansja
 * Autor:       Dominik Majak
 */////////////////////////////////////////
 
 
-
-#ifndef PLA_PARSER_HPP
-#define PLA_PARSER_HPP
-
+#ifndef KONFIGURACJA_HPP
+#define KONFIGURACJA_HPP
 
 
+// sciezki
+#define SCIEZKA_DANE_WEJSCIOWE                  "dane/dane_wejsciowe_0.txt"
+#define SCIEZKA_LOGGER                          "log/log_przetwarzanie.txt"
+
+// flagi Loggera
+#define WLACZ_LOGGER_MACIERZY_BLOKUJACYCH       1
+#define WLACZ_LOGGER_POKRYC                     1
+
+
+#endif
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: konwersja_formul.hpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#ifndef KONWERSJA_FORMUL_HPP
+#define KONWERSJA_FORMUL_HPP
+
+
+#include "kostka.hpp"
 #include <vector>
 #include <string>
-#include <fstream>
-#include "kostka.hpp"
 
 
-// struktura na dane w formacie PLA
-struct s_pla_dane
-{
-    int liczba_wejsc;
-    int liczba_wyjsc;
-    ZbiorKostek kostki_wejsciowe;
-    std::vector<std::string> wartosci_wyjsc;
-    std::string typ_pliku;
-    std::vector<std::string> nazwy_wejsc;
-    std::vector<std::string> nazwy_wyjsc;
-};
-
-
-class PlaParser
+class KonwersjaFormul
 {
 public:
-    // otworz plik pod podana sciezka
-    PlaParser (
-        const std::string& sciezka_pliku
-    );
-
-    // otworz plik z danymi w formacie PLA
-    // odczytaj dane i zapisz je w strukturze 's_pla_dane'
-    bool wczytaj_dane (
-        s_pla_dane& dane
-    );
-
-
-private:
-    std::ifstream plik;
+    static std::string konwertuj_na_formule(const Kostka& kostka, const std::vector<std::string>& nazwy_wejsc);
 };
 
 
 #endif
 
 
-
-
-
 /*////////////////////////////////////////
-* Nazwa pliku: pla_parser.cpp
+* Nazwa pliku: konwersja_formul.cpp
 * Projekt:     MSL - Ekspansja
 * Autor:       Dominik Majak
 */////////////////////////////////////////
 
 
-#include "pla_parser.hpp"
-#include <sstream>
-#include <iostream>
+#include "konwersja_formul.hpp"
 
 
-PlaParser::PlaParser (
-    const std::string& sciezka_pliku
-) {
-    plik.open( sciezka_pliku); // otworz plik przy inicjalizacji
-}
-
-
-bool PlaParser::wczytaj_dane (
-    s_pla_dane& dane
-) {
-    if ( !plik.is_open()) // czy plik jest zamkniety?
-        return false;
-
-    std::string linia;
-
-    while ( std::getline( plik, linia)) // dopoki sa linie do odczytania
+std::string KonwersjaFormul::konwertuj_na_formule(const Kostka& kostka, const std::vector<std::string>& nazwy_wejsc)
+{
+    std::string formula;
+    for (size_t i = 0; i < kostka.rozmiar(); ++i)
     {
-        if (linia.empty()) // jezeli jest pusta linia
-            continue;
-        
-        std::istringstream strumien( linia);
-        std::string klucz;
-        strumien >> klucz; // zapisz znaki, wg ktorych przydzielisz do odpowiedniej grupy
-
-        if (klucz == ".type")
-        {
-            strumien >> dane.typ_pliku;
-        }
-        else if (klucz == ".i")
-        {
-            strumien >> dane.liczba_wejsc;
-        }
-        else if (klucz == ".o")
-        {
-            strumien >> dane.liczba_wyjsc;
-        }
-        else if (klucz == ".ilb")
-        {
-            for ( int i=0; i < dane.liczba_wejsc; ++i)
-            {
-                std::string nazwa;
-                strumien >> nazwa;
-                dane.nazwy_wejsc.push_back( nazwa);
-            }
-        }
-        else if (klucz == ".ob")
-        {
-            for (int i = 0; i < dane.liczba_wyjsc; ++i)
-            {
-                std::string nazwa;
-                strumien >> nazwa;
-                dane.nazwy_wyjsc.push_back( nazwa);
-            }
-        }
-        else if (klucz == ".p")
-        {
-            // ignoruj liczbe kostek
-        }
-        else if (klucz == ".e")
-        {
-            break; // zakoncz czytanie pliku
-        }
-        else if ( !klucz.empty() && klucz[0] != '.')
-        {
-            std::string wejscie = klucz;   // pierwszy klucz to wzorzec wejsciowy
-            std::string wyjscie;
-
-            // drugi klucz to wartosc wyjsciowa
-            if ( !(strumien >> wyjscie))
-            {
-                std::cerr << "Pominieto wiersz danych (brak wyjscia): " << wejscie << "\n";
-                continue;
-            }
-
-            // sprawdzenie: dlugosc wejscia = liczba wejsc
-            if ( !wejscie.empty() && static_cast<int>(wejscie.size()) == dane.liczba_wejsc)
-            {
-                dane.kostki_wejsciowe.dodaj_kostke( Kostka(wejscie)); // dodaj kostke
-                dane.wartosci_wyjsc.push_back( wyjscie); // dodaj wyjscie
-            }
-            else
-            {
-                std::cerr << "Pominieto wiersz danych (niewlasciwa długosc): " << wejscie << " " << wyjscie << "\n";
-            }
+        if (kostka[i] == '0') {
+            formula += "~" + nazwy_wejsc[i] + " * ";
+        } else if (kostka[i] == '1') {
+            formula += nazwy_wejsc[i] + " * ";
         }
     }
-
-    return true;
+    if (!formula.empty()) {
+        formula = formula.substr(0, formula.size() - 3);
+    }
+    return formula;
 }
-
-
-
 
 
 /*////////////////////////////////////////
@@ -302,9 +212,6 @@ private:
 
 
 #endif
-
-
-
 
 
 /*////////////////////////////////////////
@@ -377,7 +284,680 @@ std::vector<Kostka> ZbiorKostek::pobierz_kostki() const
 }
 
 
+/*////////////////////////////////////////
+* Nazwa pliku: logger.hpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
 
+
+#ifndef LOGGER_HPP
+#define LOGGER_HPP
+
+
+#include <fstream>
+#include <mutex>
+#include <string>
+
+
+class Logger
+{
+public:
+    static void inicjalizuj (
+        const std::string& sciezka = "log/log_przetwarzanie.txt", // domyslna sciezka: log/log_przetwarzanie.txt
+        bool truncate = true // truncate==true — nadpisuje log przy starcie
+    );
+
+    // zapisz log w jednej linii
+    static void info (
+        const std::string& lina
+    );
+
+    // zamknij plik
+    static void close();
+
+    // dostęp do strumienia (np. do <<)
+    static std::ofstream& stream();
+
+private:
+    static std::ofstream plik; // uchwyt do pliku
+    static std::mutex mtx; // mutex do blokowania dostepu do zasobow w czasie zapisywania
+};
+
+
+#endif
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: logger.cpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#include "logger.hpp"
+#include <filesystem>
+
+
+std::ofstream Logger::plik;
+std::mutex Logger::mtx;
+
+
+void Logger::inicjalizuj (
+    const std::string& sciezka,
+    bool truncate
+) {
+    std::scoped_lock lock(mtx); // zablokuj dostep
+
+    if ( !sciezka.empty()) // jezeli podano sciezke
+    {
+        auto s = std::filesystem::path(sciezka).parent_path();
+        if (!s.empty())
+            std::filesystem::create_directories( s); // utworz sciezke
+    }
+
+    if (plik.is_open())
+        plik.close();
+
+    std::ios::openmode tryb_otwarcia = std::ios::out;
+    tryb_otwarcia |= truncate ? std::ios::trunc : std::ios::app; // wybierz jak otworzyc plik
+
+    plik.open( sciezka, tryb_otwarcia);
+}
+
+
+void Logger::info (
+    const std::string& lina
+) {
+    std::scoped_lock lock(mtx);
+
+    if (plik.is_open())
+    {
+        plik << lina << '\n'; // zapisuj dane do bufora
+        plik.flush(); // wymus zwolnienie bufora i zapisz dane
+    }
+}
+
+
+void Logger::close()
+{
+    std::scoped_lock lock(mtx);
+
+    if (plik.is_open())
+        plik.close();
+}
+
+
+std::ofstream& Logger::stream()
+{
+    return plik;
+}
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: minimalizacja.hpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#ifndef MINIMALIZACJA_HPP
+#define MINIMALIZACJA_HPP
+
+
+#include <vector>
+#include <string>
+#include "kostka.hpp"
+#include "generowanie_implikantow_prostych.hpp" // definicja TablicaImplikantowProstych
+#include "redukcja_tablicy.hpp"
+#include "wypisywanie_wynikow.hpp"
+
+
+class Minimalizacja
+{
+public:
+    using PokrycieKolumnowe = std::vector<std::size_t>;
+
+    // przekazanie nazw wejsc
+    void ustaw_nazwy_wejsc(const std::vector<std::string>& nazwy);
+    // przekazanie nazw wyjsc
+    void ustaw_nazwy_wyjsc(const std::vector<std::string>& nazwy);
+    std::string get_nazwa_wyjscia(const unsigned int& numer);
+
+    // glowna logika (przekierowana GenerowanieImplikantowProstych)
+    TablicaImplikantowProstych wyznacz_tablice_implikantow_prostych(
+        const ZbiorKostek& F,
+        const ZbiorKostek& R
+    );
+
+    // glowna logika (przekierowana do RedukcjaTablicy)
+    PokrycieKolumnowe wyznacz_minimalny_zbior_implikantow(
+        const TablicaImplikantowProstych& tab
+    );
+
+    // glowna logika (przekierowana WypisywanieWynikow)
+    void zapisz_formule(
+        const TablicaImplikantowProstych& tab,
+        const PokrycieKolumnowe& minimalny_zbior,
+        const std::string& nazwa_wyjscia
+    ) const;
+
+private:
+    std::vector<std::string> nazwy_wejsc;
+    std::vector<std::string> nazwy_wyjsc;
+
+    GenerowanieImplikantowProstych generator;
+    RedukcjaTablicy reduktor;
+    WypisywanieWynikow pisanie;
+};
+
+
+#endif
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: minimalizacja.cpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#include "minimalizacja.hpp"
+
+
+void Minimalizacja::ustaw_nazwy_wejsc(const std::vector<std::string>& nazwy)
+{
+    nazwy_wejsc = nazwy;
+}
+
+
+void Minimalizacja::ustaw_nazwy_wyjsc(const std::vector<std::string>& nazwy)
+{
+    nazwy_wyjsc = nazwy;
+}
+
+
+std::string Minimalizacja::get_nazwa_wyjscia(const unsigned int& numer)
+{
+    if (numer < nazwy_wyjsc.size())
+        return nazwy_wyjsc[numer];
+    return "";
+}
+
+
+TablicaImplikantowProstych Minimalizacja::wyznacz_tablice_implikantow_prostych(
+    const ZbiorKostek& F,
+    const ZbiorKostek& R
+) {
+    return generator.wyznacz_tablice_implikantow_prostych(F, R, nazwy_wejsc);
+}
+
+
+Minimalizacja::PokrycieKolumnowe Minimalizacja::wyznacz_minimalny_zbior_implikantow(
+    const TablicaImplikantowProstych& tab
+) {
+    return reduktor.wyznacz_minimalny_zbior_implikantow(tab);
+}
+
+
+void Minimalizacja::zapisz_formule(
+    const TablicaImplikantowProstych& tab,
+    const PokrycieKolumnowe& minimalny_zbior,
+    const std::string& nazwa_wyjscia
+) const {
+    pisanie.zapisz_formule(tab, minimalny_zbior, nazwa_wyjscia, nazwy_wejsc);
+}
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: operacje_na_kostkach.hpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#ifndef OPERACJE_NA_KOSTKACH_HPP
+#define OPERACJE_NA_KOSTKACH_HPP
+
+
+#include "kostka.hpp"
+
+
+// klasa pomocnicza do operacji logicznych na kostkach
+class OperacjeNaKostkach
+{
+public:
+    static bool czy_kostki_roznia_sie_o_jeden_bit(const Kostka& k1, const Kostka& k2);
+    static Kostka lacz_kostki(const Kostka& k1, const Kostka& k2);
+    static int liczba_jednynek_w_kostce(const Kostka& k);
+    static bool czy_kostka_zawiera(const Kostka& wieksza, const Kostka& mniejsza);
+    static bool czy_implikant_pokrywa_kostke(const Kostka& P, const Kostka& K);
+};
+
+
+#endif
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: operacje_na_kostkach.cpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#include "operacje_na_kostkach.hpp"
+#include <algorithm>
+
+
+bool OperacjeNaKostkach::czy_kostki_roznia_sie_o_jeden_bit(const Kostka& k1, const Kostka& k2)
+{
+    if (k1.rozmiar() != k2.rozmiar()) return false;
+    int roznice = 0;
+    for (size_t i = 0; i < k1.rozmiar(); ++i)
+    {
+        if (k1[i] != k2[i])
+        {
+            if (k1[i] == '-' || k2[i] == '-') return false;
+            roznice++;
+            if (roznice > 1) return false;
+        }
+    }
+    return roznice == 1;
+}
+
+
+Kostka OperacjeNaKostkach::lacz_kostki(const Kostka& k1, const Kostka& k2)
+{
+    std::string wynik = k1.pobierz_wartosc();
+    for (size_t i = 0; i < k1.rozmiar(); ++i)
+    {
+        if (k1[i] != k2[i]) wynik[i] = '-';
+    }
+    return Kostka(wynik);
+}
+
+
+int OperacjeNaKostkach::liczba_jednynek_w_kostce(const Kostka& k)
+{
+    int licznik = 0;
+    for (size_t i = 0; i < k.rozmiar(); ++i)
+    {
+        if (k[i] == '1') licznik++;
+    }
+    return licznik;
+}
+
+
+bool OperacjeNaKostkach::czy_kostka_zawiera(const Kostka& wieksza, const Kostka& mniejsza)
+{
+    if (wieksza.rozmiar() != mniejsza.rozmiar()) return false;
+    for (size_t i = 0; i < wieksza.rozmiar(); ++i)
+    {
+        if (wieksza[i] != '-' && wieksza[i] != mniejsza[i]) return false;
+    }
+    return true;
+}
+
+
+bool OperacjeNaKostkach::czy_implikant_pokrywa_kostke(const Kostka& P, const Kostka& K)
+{
+    const std::size_t n = std::min(P.rozmiar(), K.rozmiar());
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const char p = P[i];
+        const char k = K[i];
+        if (k == '-') {
+            if (p != '-') return false;
+        } else {
+            if (!(p == '-' || p == k)) return false;
+        }
+    }
+    for (std::size_t i = n; i < P.rozmiar(); ++i) {
+        if (P[i] != '-') return false;
+    }
+    return true;
+}
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: pla_parser.hpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+
+#ifndef PLA_PARSER_HPP
+#define PLA_PARSER_HPP
+
+
+
+#include <vector>
+#include <string>
+#include <fstream>
+#include "kostka.hpp"
+
+
+// struktura na dane w formacie PLA
+struct s_pla_dane
+{
+    int liczba_wejsc;
+    int liczba_wyjsc;
+    ZbiorKostek kostki_wejsciowe;
+    std::vector<std::string> wartosci_wyjsc;
+    std::string typ_pliku;
+    std::vector<std::string> nazwy_wejsc;
+    std::vector<std::string> nazwy_wyjsc;
+};
+
+
+class PlaParser
+{
+public:
+    // otworz plik pod podana sciezka
+    PlaParser (
+        const std::string& sciezka_pliku
+    );
+
+    // otworz plik z danymi w formacie PLA
+    // odczytaj dane i zapisz je w strukturze 's_pla_dane'
+    bool wczytaj_dane (
+        s_pla_dane& dane
+    );
+
+
+private:
+    std::ifstream plik;
+};
+
+
+#endif
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: pla_parser.cpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#include "pla_parser.hpp"
+#include <sstream>
+#include <iostream>
+
+
+PlaParser::PlaParser (
+    const std::string& sciezka_pliku
+) {
+    plik.open( sciezka_pliku); // otworz plik przy inicjalizacji
+}
+
+
+bool PlaParser::wczytaj_dane (
+    s_pla_dane& dane
+) {
+    if ( !plik.is_open()) // czy plik jest zamkniety?
+        return false;
+
+    std::string linia;
+
+    while ( std::getline( plik, linia)) // dopoki sa linie do odczytania
+    {
+        if (linia.empty()) // jezeli jest pusta linia
+            continue;
+        
+        std::istringstream strumien( linia);
+        std::string klucz;
+        strumien >> klucz; // zapisz znaki, wg ktorych przydzielisz do odpowiedniej grupy
+
+        if (klucz == ".type")
+        {
+            strumien >> dane.typ_pliku;
+        }
+        else if (klucz == ".i")
+        {
+            strumien >> dane.liczba_wejsc;
+        }
+        else if (klucz == ".o")
+        {
+            strumien >> dane.liczba_wyjsc;
+        }
+        else if (klucz == ".ilb")
+        {
+            for ( int i=0; i < dane.liczba_wejsc; ++i)
+            {
+                std::string nazwa;
+                strumien >> nazwa;
+                dane.nazwy_wejsc.push_back( nazwa);
+            }
+        }
+        else if (klucz == ".ob")
+        {
+            for (int i = 0; i < dane.liczba_wyjsc; ++i)
+            {
+                std::string nazwa;
+                strumien >> nazwa;
+                dane.nazwy_wyjsc.push_back( nazwa);
+            }
+        }
+        else if (klucz == ".p")
+        {
+        
+        }
+        else if (klucz == ".e")
+        {
+            break; // zakoncz czytanie pliku
+        }
+        else if ( !klucz.empty() && klucz[0] != '.')
+        {
+            std::string wejscie = klucz;   // pierwszy klucz to wzorzec wejsciowy
+            std::string wyjscie;
+
+            // drugi klucz to wartosc wyjsciowa
+            if ( !(strumien >> wyjscie))
+            {
+                std::cerr << "Pominieto wiersz danych (brak wyjscia): " << wejscie << "\n";
+                continue;
+            }
+
+            // sprawdzenie: dlugosc wejscia = liczba wejsc
+            if ( !wejscie.empty() && static_cast<int>(wejscie.size()) == dane.liczba_wejsc)
+            {
+                dane.kostki_wejsciowe.dodaj_kostke( Kostka(wejscie)); // dodaj kostke
+                dane.wartosci_wyjsc.push_back( wyjscie); // dodaj wyjscie
+            }
+            else
+            {
+                std::cerr << "Pominieto wiersz danych (niewlasciwa długosc): " << wejscie << " " << wyjscie << "\n";
+            }
+        }
+    }
+
+    return true;
+}
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: redukcja_tablicy.hpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#ifndef REDUKCJA_TABLICY_HPP
+#define REDUKCJA_TABLICY_HPP
+
+
+#include <vector>
+#include "generowanie_implikantow_prostych.hpp" // dla TablicaImplikantowProstych
+#include "szukanie_pokryc.hpp"
+
+
+class RedukcjaTablicy
+{
+public:
+    using PokrycieKolumnowe = std::vector<std::size_t>;
+
+    PokrycieKolumnowe wyznacz_minimalny_zbior_implikantow(const TablicaImplikantowProstych& tab);
+
+private:
+    SzukaniePokryc szukaniePokryc;
+};
+
+
+#endif
+
+
+/*////////////////////////////////////////
+* Nazwa pliku: redukcja_tablicy.cpp
+* Projekt:     MSL - Ekspansja
+* Autor:       Dominik Majak
+*/////////////////////////////////////////
+
+
+#include "redukcja_tablicy.hpp"
+#include "logger.hpp"
+#include "konfiguracja.hpp"
+#include <algorithm>
+#include <sstream>
+
+
+RedukcjaTablicy::PokrycieKolumnowe RedukcjaTablicy::wyznacz_minimalny_zbior_implikantow(const TablicaImplikantowProstych& tab)
+{
+    PokrycieKolumnowe wynik;
+    const std::size_t m = tab.kostki.size();
+    const std::size_t n = tab.implikanty_proste.size();
+    if (m == 0 || n == 0) {
+#if WLACZ_LOGGER_POKRYC
+        Logger::info("Wyznaczanie minimalnego zbioru implikantów: pusta tablica.");
+#endif
+        return wynik;
+    }
+
+    const auto& macierz_pokrycia = tab.macierz;
+    std::vector<bool> implikant_istotny(n, false);
+
+    for (std::size_t i = 0; i < m; ++i)
+    {
+        if (i >= macierz_pokrycia.size()) break;
+        std::size_t licznik = 0;
+        std::size_t ostatnia_kolumna = 0;
+        const std::size_t dlugosc_wiersza = macierz_pokrycia[i].size();
+        for (std::size_t j = 0; j < n && j < dlugosc_wiersza; ++j)
+            if (macierz_pokrycia[i][j]) { ++licznik; ostatnia_kolumna = j; }
+
+        if (licznik == 1)
+            implikant_istotny[ostatnia_kolumna] = true;
+    }
+
+    std::vector<bool> wiersz_pokryty(m, false);
+    for (std::size_t i = 0; i < m; ++i)
+    {
+        if (i >= macierz_pokrycia.size()) break;
+        const std::size_t dlugosc_wiersza = macierz_pokrycia[i].size();
+        for (std::size_t j = 0; j < n && j < dlugosc_wiersza; ++j)
+        {
+            if (implikant_istotny[j] && macierz_pokrycia[i][j]) {
+                wiersz_pokryty[i] = true;
+                break;
+            }
+        }
+    }
+
+    std::vector<std::size_t> mapa_wierszy, mapa_kolumn;
+    for (std::size_t i = 0; i < m; ++i)
+        if (!wiersz_pokryty[i]) mapa_wierszy.push_back(i);
+
+    for (std::size_t j = 0; j < n; ++j)
+    {
+        if (implikant_istotny[j]) continue;
+        bool przydatny = false;
+        for (std::size_t indeks_wiersza = 0; indeks_wiersza < mapa_wierszy.size(); ++indeks_wiersza)
+        {
+            std::size_t i = mapa_wierszy[indeks_wiersza];
+            if (i < macierz_pokrycia.size() && j < macierz_pokrycia[i].size() && macierz_pokrycia[i][j])
+            {
+                przydatny = true;
+                break;
+            }
+        }
+        if (przydatny) mapa_kolumn.push_back(j);
+    }
+
+    std::vector<std::vector<bool>> macierz_zredukowana;
+    macierz_zredukowana.assign(mapa_wierszy.size(), std::vector<bool>(mapa_kolumn.size(), false));
+    for (std::size_t indeks_wiersza = 0; indeks_wiersza < mapa_wierszy.size(); ++indeks_wiersza)
+    {
+        std::size_t i = mapa_wierszy[indeks_wiersza];
+        for (std::size_t indeks_kolumny = 0; indeks_kolumny < mapa_kolumn.size(); ++indeks_kolumny)
+        {
+            std::size_t j = mapa_kolumn[indeks_kolumny];
+            if (i < macierz_pokrycia.size() && j < macierz_pokrycia[i].size())
+                macierz_zredukowana[indeks_wiersza][indeks_kolumny] = macierz_pokrycia[i][j];
+        }
+    }
+
+    std::vector<PokrycieKolumnowe> minimalne_pokrycia;
+    if (!mapa_wierszy.empty() && !mapa_kolumn.empty())
+    {
+        const std::size_t liczba_kolumn_zredukowanych = mapa_kolumn.size();
+        PokrycieKolumnowe aktualne_pokrycie;
+        for (std::size_t k = 1; k <= liczba_kolumn_zredukowanych; ++k)
+        {
+            bool znaleziono_poziom = false;
+            aktualne_pokrycie.clear();
+            szukaniePokryc.dfs_minimalne_pokrycia(
+                macierz_zredukowana,
+                liczba_kolumn_zredukowanych,
+                aktualne_pokrycie,
+                minimalne_pokrycia,
+                0, k, znaleziono_poziom
+            );
+            if (znaleziono_poziom) break;
+        }
+    }
+
+    for (std::size_t j = 0; j < n; ++j)
+        if (implikant_istotny[j]) wynik.push_back(j);
+
+    if (!minimalne_pokrycia.empty())
+    {
+        const auto& pokrycie_zredukowane = minimalne_pokrycia.front();
+        for (std::size_t indeks = 0; indeks < pokrycie_zredukowane.size(); ++indeks)
+        {
+            std::size_t kolumna_zredukowana = pokrycie_zredukowane[indeks];
+            if (kolumna_zredukowana < mapa_kolumn.size())
+                wynik.push_back(mapa_kolumn[kolumna_zredukowana]);
+        }
+    }
+
+    std::sort(wynik.begin(), wynik.end());
+    wynik.erase(std::unique(wynik.begin(), wynik.end()), wynik.end());
+
+#if WLACZ_LOGGER_POKRYC
+    {
+        std::ostringstream oss;
+        oss << "Minimalny zbiór implikantów (indeksy): { ";
+        for (std::size_t t = 0; t < wynik.size(); ++t) {
+            oss << wynik[t];
+            if (t + 1 < wynik.size()) oss << ", ";
+        }
+        oss << " }";
+        Logger::info(oss.str());
+    }
+    {
+        std::ostringstream oss;
+        oss << "Minimalny zbiór implikantów (nazwy): ";
+        for (std::size_t t = 0; t < wynik.size(); ++t) {
+            oss << "I" << wynik[t];
+            if (t + 1 < wynik.size()) oss << ", ";
+        }
+        Logger::info(oss.str());
+    }
+#endif
+
+    return wynik;
+}
 
 
 /*////////////////////////////////////////
@@ -432,9 +1012,6 @@ private:
 
 
 #endif
-
-
-
 
 
 /*////////////////////////////////////////
@@ -572,130 +1149,6 @@ void SzukaniePokryc::dfs_minimalne_pokrycia(
 }
 
 
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: minimalizacja.hpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#ifndef MINIMALIZACJA_HPP
-#define MINIMALIZACJA_HPP
-
-
-#include <vector>
-#include <string>
-#include "kostka.hpp"
-#include "generowanie_implikantow_prostych.hpp" // definicja TablicaImplikantowProstych
-#include "redukcja_tablicy.hpp"
-#include "wypisywanie_wynikow.hpp"
-
-
-class Minimalizacja
-{
-public:
-    using PokrycieKolumnowe = std::vector<std::size_t>;
-
-    // przekazanie nazw wejsc
-    void ustaw_nazwy_wejsc(const std::vector<std::string>& nazwy);
-    // przekazanie nazw wyjsc
-    void ustaw_nazwy_wyjsc(const std::vector<std::string>& nazwy);
-    std::string get_nazwa_wyjscia(const unsigned int& numer);
-
-    // glowna logika (przekierowana GenerowanieImplikantowProstych)
-    TablicaImplikantowProstych wyznacz_tablice_implikantow_prostych(
-        const ZbiorKostek& F,
-        const ZbiorKostek& R
-    );
-
-    // glowna logika (przekierowana do RedukcjaTablicy)
-    PokrycieKolumnowe wyznacz_minimalny_zbior_implikantow(
-        const TablicaImplikantowProstych& tab
-    );
-
-    // glowna logika (przekierowana WypisywanieWynikow)
-    void zapisz_formule(
-        const TablicaImplikantowProstych& tab,
-        const PokrycieKolumnowe& minimalny_zbior,
-        const std::string& nazwa_wyjscia
-    ) const;
-
-private:
-    std::vector<std::string> nazwy_wejsc;
-    std::vector<std::string> nazwy_wyjsc;
-
-    GenerowanieImplikantowProstych generator;
-    RedukcjaTablicy reduktor;
-    WypisywanieWynikow pisanie;
-};
-
-
-#endif
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: minimalizacja.cpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#include "minimalizacja.hpp"
-
-
-void Minimalizacja::ustaw_nazwy_wejsc(const std::vector<std::string>& nazwy)
-{
-    nazwy_wejsc = nazwy;
-}
-
-
-void Minimalizacja::ustaw_nazwy_wyjsc(const std::vector<std::string>& nazwy)
-{
-    nazwy_wyjsc = nazwy;
-}
-
-
-std::string Minimalizacja::get_nazwa_wyjscia(const unsigned int& numer)
-{
-    if (numer < nazwy_wyjsc.size())
-        return nazwy_wyjsc[numer];
-    return "";
-}
-
-
-TablicaImplikantowProstych Minimalizacja::wyznacz_tablice_implikantow_prostych(
-    const ZbiorKostek& F,
-    const ZbiorKostek& R
-) {
-    return generator.wyznacz_tablice_implikantow_prostych(F, R, nazwy_wejsc);
-}
-
-
-Minimalizacja::PokrycieKolumnowe Minimalizacja::wyznacz_minimalny_zbior_implikantow(
-    const TablicaImplikantowProstych& tab
-) {
-    return reduktor.wyznacz_minimalny_zbior_implikantow(tab);
-}
-
-
-void Minimalizacja::zapisz_formule(
-    const TablicaImplikantowProstych& tab,
-    const PokrycieKolumnowe& minimalny_zbior,
-    const std::string& nazwa_wyjscia
-) const {
-    pisanie.zapisz_formule(tab, minimalny_zbior, nazwa_wyjscia, nazwy_wejsc);
-}
-
-
-
-
-
 /*////////////////////////////////////////
 * Nazwa pliku: wypisywanie_wynikow.hpp
 * Projekt:     MSL - Ekspansja
@@ -727,9 +1180,6 @@ public:
 
 
 #endif
-
-
-
 
 
 /*////////////////////////////////////////
@@ -821,596 +1271,6 @@ void WypisywanieWynikow::zapisz_formule(
 }
 
 
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: redukcja_tablicy.hpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#ifndef REDUKCJA_TABLICY_HPP
-#define REDUKCJA_TABLICY_HPP
-
-
-#include <vector>
-#include "generowanie_implikantow_prostych.hpp" // dla TablicaImplikantowProstych
-#include "szukanie_pokryc.hpp"
-
-
-class RedukcjaTablicy
-{
-public:
-    using PokrycieKolumnowe = std::vector<std::size_t>;
-
-    PokrycieKolumnowe wyznacz_minimalny_zbior_implikantow(const TablicaImplikantowProstych& tab);
-
-private:
-    SzukaniePokryc szukaniePokryc;
-};
-
-
-#endif
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: redukcja_tablicy.cpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#include "redukcja_tablicy.hpp"
-#include "logger.hpp"
-#include "konfiguracja.hpp"
-#include <algorithm>
-#include <sstream>
-
-
-RedukcjaTablicy::PokrycieKolumnowe RedukcjaTablicy::wyznacz_minimalny_zbior_implikantow(const TablicaImplikantowProstych& tab)
-{
-    PokrycieKolumnowe wynik;
-    const std::size_t m = tab.kostki.size();
-    const std::size_t n = tab.implikanty_proste.size();
-    if (m == 0 || n == 0) {
-#if WLACZ_LOGGER_POKRYC
-        Logger::info("Wyznaczanie minimalnego zbioru implikantów: pusta tablica.");
-#endif
-        return wynik;
-    }
-
-    const auto& macierz_pokrycia = tab.macierz;
-    std::vector<bool> implikant_istotny(n, false);
-
-    for (std::size_t i = 0; i < m; ++i)
-    {
-        if (i >= macierz_pokrycia.size()) break;
-        std::size_t licznik = 0;
-        std::size_t ostatnia_kolumna = 0;
-        const std::size_t dlugosc_wiersza = macierz_pokrycia[i].size();
-        for (std::size_t j = 0; j < n && j < dlugosc_wiersza; ++j)
-            if (macierz_pokrycia[i][j]) { ++licznik; ostatnia_kolumna = j; }
-
-        if (licznik == 1)
-            implikant_istotny[ostatnia_kolumna] = true;
-    }
-
-    std::vector<bool> wiersz_pokryty(m, false);
-    for (std::size_t i = 0; i < m; ++i)
-    {
-        if (i >= macierz_pokrycia.size()) break;
-        const std::size_t dlugosc_wiersza = macierz_pokrycia[i].size();
-        for (std::size_t j = 0; j < n && j < dlugosc_wiersza; ++j)
-        {
-            if (implikant_istotny[j] && macierz_pokrycia[i][j]) {
-                wiersz_pokryty[i] = true;
-                break;
-            }
-        }
-    }
-
-    std::vector<std::size_t> mapa_wierszy, mapa_kolumn;
-    for (std::size_t i = 0; i < m; ++i)
-        if (!wiersz_pokryty[i]) mapa_wierszy.push_back(i);
-
-    for (std::size_t j = 0; j < n; ++j)
-    {
-        if (implikant_istotny[j]) continue;
-        bool przydatny = false;
-        for (std::size_t indeks_wiersza = 0; indeks_wiersza < mapa_wierszy.size(); ++indeks_wiersza)
-        {
-            std::size_t i = mapa_wierszy[indeks_wiersza];
-            if (i < macierz_pokrycia.size() && j < macierz_pokrycia[i].size() && macierz_pokrycia[i][j])
-            {
-                przydatny = true;
-                break;
-            }
-        }
-        if (przydatny) mapa_kolumn.push_back(j);
-    }
-
-    std::vector<std::vector<bool>> macierz_zredukowana;
-    macierz_zredukowana.assign(mapa_wierszy.size(), std::vector<bool>(mapa_kolumn.size(), false));
-    for (std::size_t indeks_wiersza = 0; indeks_wiersza < mapa_wierszy.size(); ++indeks_wiersza)
-    {
-        std::size_t i = mapa_wierszy[indeks_wiersza];
-        for (std::size_t indeks_kolumny = 0; indeks_kolumny < mapa_kolumn.size(); ++indeks_kolumny)
-        {
-            std::size_t j = mapa_kolumn[indeks_kolumny];
-            if (i < macierz_pokrycia.size() && j < macierz_pokrycia[i].size())
-                macierz_zredukowana[indeks_wiersza][indeks_kolumny] = macierz_pokrycia[i][j];
-        }
-    }
-
-    std::vector<PokrycieKolumnowe> minimalne_pokrycia;
-    if (!mapa_wierszy.empty() && !mapa_kolumn.empty())
-    {
-        const std::size_t liczba_kolumn_zredukowanych = mapa_kolumn.size();
-        PokrycieKolumnowe aktualne_pokrycie;
-        for (std::size_t k = 1; k <= liczba_kolumn_zredukowanych; ++k)
-        {
-            bool znaleziono_poziom = false;
-            aktualne_pokrycie.clear();
-            szukajPokryc.dfs_minimalne_pokrycia(
-                macierz_zredukowana,
-                liczba_kolumn_zredukowanych,
-                aktualne_pokrycie,
-                minimalne_pokrycia,
-                0, k, znaleziono_poziom
-            );
-            if (znaleziono_poziom) break;
-        }
-    }
-
-    for (std::size_t j = 0; j < n; ++j)
-        if (implikant_istotny[j]) wynik.push_back(j);
-
-    if (!minimalne_pokrycia.empty())
-    {
-        const auto& pokrycie_zredukowane = minimalne_pokrycia.front();
-        for (std::size_t indeks = 0; indeks < pokrycie_zredukowane.size(); ++indeks)
-        {
-            std::size_t kolumna_zredukowana = pokrycie_zredukowane[indeks];
-            if (kolumna_zredukowana < mapa_kolumn.size())
-                wynik.push_back(mapa_kolumn[kolumna_zredukowana]);
-        }
-    }
-
-    std::sort(wynik.begin(), wynik.end());
-    wynik.erase(std::unique(wynik.begin(), wynik.end()), wynik.end());
-
-#if WLACZ_LOGGER_POKRYC
-    {
-        std::ostringstream oss;
-        oss << "Minimalny zbiór implikantów (indeksy): { ";
-        for (std::size_t t = 0; t < wynik.size(); ++t) {
-            oss << wynik[t];
-            if (t + 1 < wynik.size()) oss << ", ";
-        }
-        oss << " }";
-        Logger::info(oss.str());
-    }
-    {
-        std::ostringstream oss;
-        oss << "Minimalny zbiór implikantów (nazwy): ";
-        for (std::size_t t = 0; t < wynik.size(); ++t) {
-            oss << "I" << wynik[t];
-            if (t + 1 < wynik.size()) oss << ", ";
-        }
-        Logger::info(oss.str());
-    }
-#endif
-
-    return wynik;
-}
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: generowanie_implikantow_prostych.hpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-
-#ifndef GENEROWANIE_IMPLIKANTOW_PROSTYCH_HPP
-#define GENEROWANIE_IMPLIKANTOW_PROSTYCH_HPP
-
-
-#include <vector>
-#include <string>
-#include "kostka.hpp"
-#include "szukanie_pokryc.hpp"
-
-
-// struktura opisujaca tablice implikantow
-struct TablicaImplikantowProstych
-{
-    std::vector<Kostka> implikanty_proste;  // kolumny
-    std::vector<Kostka> kostki;             // wiersze z 'F'
-    std::vector<std::vector<bool>> macierz; // macierz pokrycia
-};
-
-
-class GenerowanieImplikantowProstych
-{
-public:
-    using PokrycieKolumnowe = std::vector<std::size_t>;
-    using PokryciaDlaKostki = std::vector<PokrycieKolumnowe>;
-    using PokryciaDlaZbioru = std::vector<PokryciaDlaKostki>;
-
-    GenerowanieImplikantowProstych();
-
-    TablicaImplikantowProstych wyznacz_tablice_implikantow_prostych(
-        const ZbiorKostek& F,
-        const ZbiorKostek& R,
-        const std::vector<std::string>& nazwy_wejsc
-    );
-
-private:
-    SzukaniePokryc szukaniePokryc;
-
-    PokryciaDlaZbioru znajdz_pokrycia(
-        const ZbiorKostek& F,
-        const ZbiorKostek& R,
-        const std::vector<std::string>& nazwy_wejsc
-    );
-};
-
-#endif
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: generowanie_implikantow_prostych.cpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#include "generowanie_implikantow_prostych.hpp"
-#include "wyznaczanie_macierzy_blokujacych.hpp"
-#include "operacje_na_kostkach.hpp"
-#include "logger.hpp"
-#include "konfiguracja.hpp"
-#include <sstream>
-
-
-GenerowanieImplikantowProstych::GenerowanieImplikantowProstych() {}
-
-
-GenerowanieImplikantowProstych::PokryciaDlaZbioru GenerowanieImplikantowProstych::znajdz_pokrycia(
-    const ZbiorKostek& F,
-    const ZbiorKostek& R,
-    const std::vector<std::string>& nazwy_wejsc
-) {
-    PokryciaDlaZbioru wszystkie_pokrycia;
-    const std::size_t n = F.rozmiar();
-    wszystkie_pokrycia.resize(n);
-
-    for (std::size_t i = 0; i < n; ++i)
-    {
-        const Kostka& f = F[i];
-#if WLACZ_LOGGER_POKRYC
-        Logger::info("Przetwarzanie kostki F[" + std::to_string(i) + "]: " + f.pobierz_wartosc());
-#endif
-        auto B = WyznaczanieMacierzyBlokujacych::wyznacz_macierz_blokujaca(f, R);
-        auto pokrycia = szukaniePokryc.znajdz_wszystkie_minimalne_pokrycia_kolumnowe(B);
-
-        if (pokrycia.empty())
-        {
-#if WLACZ_LOGGER_POKRYC
-            Logger::info("  Brak pokrycia kolumnowego dla tej macierzy blokującej.");
-#endif
-            wszystkie_pokrycia[i].clear();
-            continue;
-        }
-
-        for (const auto& pokrycie : pokrycia)
-        {
-            if (!szukaniePokryc.czy_jest_pokryciem(B, pokrycie))
-            {
-#if WLACZ_LOGGER_POKRYC
-                Logger::info("  UWAGA: sprawdzane pokrycie nie pokrywa macierzy blokującej.");
-#endif
-            }
-#if WLACZ_LOGGER_POKRYC
-            {
-                std::ostringstream oss;
-                oss << "  Minimalne pokrycie kolumnowe (indeksy): { ";
-                for (std::size_t k = 0; k < pokrycie.size(); ++k) {
-                    oss << pokrycie[k];
-                    if (k + 1 < pokrycie.size()) oss << ", ";
-                }
-                oss << " }";
-                Logger::info(oss.str());
-            }
-            {
-                std::ostringstream oss;
-                oss << "  Minimalne pokrycie kolumnowe (wejścia): { ";
-                for (std::size_t j = 0; j < pokrycie.size(); ++j) {
-                    std::size_t p = pokrycie[j];
-                    if (!nazwy_wejsc.empty() && p < nazwy_wejsc.size())
-                        oss << nazwy_wejsc[p];
-                    else if (p < 26)
-                        oss << static_cast<char>('a' + static_cast<char>(p));
-                    else
-                        oss << "kol" << p;
-                    if (j + 1 < pokrycie.size()) oss << ", ";
-                }
-                oss << " }";
-                Logger::info(oss.str());
-            }
-#endif
-        }
-        wszystkie_pokrycia[i] = std::move(pokrycia);
-    }
-    return wszystkie_pokrycia;
-}
-
-
-TablicaImplikantowProstych GenerowanieImplikantowProstych::wyznacz_tablice_implikantow_prostych(
-    const ZbiorKostek& F,
-    const ZbiorKostek& R,
-    const std::vector<std::string>& nazwy_wejsc
-) {
-    TablicaImplikantowProstych tab;
-    const std::size_t n = F.rozmiar();
-    if (n == 0) {
-#if WLACZ_LOGGER_POKRYC
-        Logger::info("Wyznaczanie tablicy implikantów prostych: zbiór F jest pusty.");
-#endif
-        return tab;
-    }
-
-#if WLACZ_LOGGER_POKRYC
-    Logger::info("Wyznaczanie tablicy implikantów prostych dla F (" + std::to_string(n) + " kostek).");
-#endif
-
-    std::vector<Kostka> implikanty_proste;
-    auto wszystkie_pokrycia = znajdz_pokrycia(F, R, nazwy_wejsc);
-
-    for (std::size_t i = 0; i < n; ++i)
-    {
-        const Kostka& f = F[i];
-#if WLACZ_LOGGER_POKRYC
-        Logger::info("  Kostka F[" + std::to_string(i) + "] = " + f.pobierz_wartosc());
-#endif
-        const auto& pokrycia = wszystkie_pokrycia[i];
-        if (pokrycia.empty()) {
-#if WLACZ_LOGGER_POKRYC
-            Logger::info("    Brak minimalnych pokryć kolumnowych dla tej kostki.");
-#endif
-            continue;
-        }
-
-        for (const auto& pokrycie : pokrycia)
-        {
-            std::string wartosc = f.pobierz_wartosc();
-            std::vector<bool> w_pokryciu(wartosc.size(), false);
-            for (std::size_t j = 0; j < pokrycie.size(); ++j) {
-                std::size_t p = pokrycie[j];
-                if (p < w_pokryciu.size()) w_pokryciu[p] = true;
-            }
-            for (std::size_t j = 0; j < wartosc.size(); ++j)
-                if (!w_pokryciu[j]) wartosc[j] = '-';
-
-            Kostka implikant(wartosc);
-            bool czy_istnieje = false;
-            for (const Kostka& k : implikanty_proste)
-                if (k.pobierz_wartosc() == wartosc) { czy_istnieje = true; break; }
-
-            if (!czy_istnieje) {
-#if WLACZ_LOGGER_POKRYC
-                Logger::info("    Dodano implikant prosty: " + wartosc + " (z kostki F[" + std::to_string(i) + "])");
-#endif
-                implikanty_proste.push_back(implikant);
-            }
-        }
-    }
-
-    tab.implikanty_proste = implikanty_proste;
-    tab.kostki.clear();
-    tab.kostki.reserve(n);
-    for (std::size_t i = 0; i < n; ++i) tab.kostki.push_back(F[i]);
-
-    const std::size_t liczba_wierszy = tab.kostki.size();
-    const std::size_t liczba_kolumn = tab.implikanty_proste.size();
-    tab.macierz.assign(liczba_wierszy, std::vector<bool>(liczba_kolumn, false));
-
-    for (std::size_t i = 0; i < liczba_wierszy; ++i)
-    {
-        const Kostka& k = tab.kostki[i];
-        for (std::size_t j = 0; j < liczba_kolumn; ++j)
-        {
-            const Kostka& ip = tab.implikanty_proste[j];
-            if (OperacjeNaKostkach::czy_implikant_pokrywa_kostke(ip, k))
-                tab.macierz[i][j] = true;
-        }
-    }
-
-#if WLACZ_LOGGER_POKRYC
-    {
-        std::ostringstream oss;
-        oss << "Implikanty proste (kolumny): ";
-        for (std::size_t j = 0; j < liczba_kolumn; ++j)
-            oss << "I" << j << " = " << tab.implikanty_proste[j].pobierz_wartosc() << "  ";
-        Logger::info(oss.str());
-    }
-    {
-        std::ostringstream oss;
-        oss << "Tablica implikantów (wiersze = kostki F):";
-        Logger::info(oss.str());
-    }
-    for (std::size_t i = 0; i < liczba_wierszy; ++i)
-    {
-        std::ostringstream oss;
-        oss << "k" << i << " (" << tab.kostki[i].pobierz_wartosc() << "): ";
-        for (std::size_t j = 0; j < liczba_kolumn; ++j)
-            oss << (tab.macierz[i][j] ? '1' : '0') << ' ';
-        Logger::info(oss.str());
-    }
-#endif
-
-    return tab;
-}
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: konfiguracja.hpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#ifndef KONFIGURACJA_HPP
-#define KONFIGURACJA_HPP
-
-
-// sciezki
-#define SCIEZKA_DANE_WEJSCIOWE                  "dane/dane_wejsciowe_1.txt"
-#define SCIEZKA_LOGGER                          "log/log_przetwarzanie.txt"
-
-// flagi Loggera
-#define WLACZ_LOGGER_MACIERZY_BLOKUJACYCH       1
-#define WLACZ_LOGGER_POKRYC                     1
-
-
-#endif
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: logger.hpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#ifndef LOGGER_HPP
-#define LOGGER_HPP
-
-
-#include <fstream>
-#include <mutex>
-#include <string>
-
-
-class Logger
-{
-public:
-    static void inicjalizuj (
-        const std::string& sciezka = "log/log_przetwarzanie.txt", // domyslna sciezka: log/log_przetwarzanie.txt
-        bool truncate = true // truncate==true — nadpisuje log przy starcie
-    );
-
-    // zapisz log w jednej linii
-    static void info (
-        const std::string& lina
-    );
-
-    // zamknij plik
-    static void close();
-
-    // dostęp do strumienia (np. do <<)
-    static std::ofstream& stream();
-
-private:
-    static std::ofstream plik; // uchwyt do pliku
-    static std::mutex mtx; // mutex do blokowania dostepu do zasobow w czasie zapisywania
-};
-
-
-#endif
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: logger.cpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#include "logger.hpp"
-#include <filesystem>
-
-
-std::ofstream Logger::plik;
-std::mutex Logger::mtx;
-
-
-void Logger::inicjalizuj (
-    const std::string& sciezka,
-    bool truncate
-) {
-    std::scoped_lock lock(mtx); // zablokuj dostep
-
-    if ( !sciezka.empty()) // jezeli podano sciezke
-    {
-        auto s = std::filesystem::path(sciezka).parent_path();
-        if (!s.empty())
-            std::filesystem::create_directories( s); // utworz sciezke
-    }
-
-    if (plik.is_open())
-        plik.close();
-
-    std::ios::openmode tryb_otwarcia = std::ios::out;
-    tryb_otwarcia |= truncate ? std::ios::trunc : std::ios::app; // wybierz jak otworzyc plik
-
-    plik.open( sciezka, tryb_otwarcia);
-}
-
-
-void Logger::info (
-    const std::string& lina
-) {
-    std::scoped_lock lock(mtx);
-
-    if (plik.is_open())
-    {
-        plik << lina << '\n'; // zapisuj dane do bufora
-        plik.flush(); // wymus zwolnienie bufora i zapisz dane
-    }
-}
-
-
-void Logger::close()
-{
-    std::scoped_lock lock(mtx);
-
-    if (plik.is_open())
-        plik.close();
-}
-
-
-std::ofstream& Logger::stream()
-{
-    return plik;
-}
-
-
-
-
-
 /*////////////////////////////////////////
 * Nazwa pliku: wyznaczenie_macierzy_blokujacych.hpp
 * Projekt:     MSL - Ekspansja
@@ -1436,9 +1296,6 @@ public:
 
 
 #endif
-
-
-
 
 
 /*////////////////////////////////////////
@@ -1508,180 +1365,4 @@ WyznaczanieMacierzyBlokujacych::MacierzBlokujaca WyznaczanieMacierzyBlokujacych:
 #endif
 
     return B;
-}
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: konwersja_formul.hpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#ifndef KONWERSJA_FORMUL_HPP
-#define KONWERSJA_FORMUL_HPP
-
-
-#include "kostka.hpp"
-#include <vector>
-#include <string>
-
-
-class KonwersjaFormul
-{
-public:
-    static std::string konwertuj_na_formule(const Kostka& kostka, const std::vector<std::string>& nazwy_wejsc);
-};
-
-
-#endif
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: konwersja_formul.cpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#include "konwersja_formul.hpp"
-
-
-std::string KonwersjaFormul::konwertuj_na_formule(const Kostka& kostka, const std::vector<std::string>& nazwy_wejsc)
-{
-    std::string formula;
-    for (size_t i = 0; i < kostka.rozmiar(); ++i)
-    {
-        if (kostka[i] == '0') {
-            formula += "~" + nazwy_wejsc[i] + " * ";
-        } else if (kostka[i] == '1') {
-            formula += nazwy_wejsc[i] + " * ";
-        }
-    }
-    if (!formula.empty()) {
-        formula = formula.substr(0, formula.size() - 3);
-    }
-    return formula;
-}
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: operacje_na_kostkach.hpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#ifndef OPERACJE_NA_KOSTKACH_HPP
-#define OPERACJE_NA_KOSTKACH_HPP
-
-
-#include "kostka.hpp"
-
-
-// klasa pomocnicza do operacji logicznych na kostkach
-class OperacjeNaKostkach
-{
-public:
-    static bool czy_kostki_roznia_sie_o_jeden_bit(const Kostka& k1, const Kostka& k2);
-    static Kostka lacz_kostki(const Kostka& k1, const Kostka& k2);
-    static int liczba_jednynek_w_kostce(const Kostka& k);
-    static bool czy_kostka_zawiera(const Kostka& wieksza, const Kostka& mniejsza);
-    static bool czy_implikant_pokrywa_kostke(const Kostka& P, const Kostka& K);
-};
-
-
-#endif
-
-
-
-
-
-/*////////////////////////////////////////
-* Nazwa pliku: operacje_na_kostkach.cpp
-* Projekt:     MSL - Ekspansja
-* Autor:       Dominik Majak
-*/////////////////////////////////////////
-
-
-#include "operacje_na_kostkach.hpp"
-#include <algorithm>
-
-
-bool OperacjeNaKostkach::czy_kostki_roznia_sie_o_jeden_bit(const Kostka& k1, const Kostka& k2)
-{
-    if (k1.rozmiar() != k2.rozmiar()) return false;
-    int roznice = 0;
-    for (size_t i = 0; i < k1.rozmiar(); ++i)
-    {
-        if (k1[i] != k2[i])
-        {
-            if (k1[i] == '-' || k2[i] == '-') return false;
-            roznice++;
-            if (roznice > 1) return false;
-        }
-    }
-    return roznice == 1;
-}
-
-
-Kostka OperacjeNaKostkach::lacz_kostki(const Kostka& k1, const Kostka& k2)
-{
-    std::string wynik = k1.pobierz_wartosc();
-    for (size_t i = 0; i < k1.rozmiar(); ++i)
-    {
-        if (k1[i] != k2[i]) wynik[i] = '-';
-    }
-    return Kostka(wynik);
-}
-
-
-int OperacjeNaKostkach::liczba_jednynek_w_kostce(const Kostka& k)
-{
-    int licznik = 0;
-    for (size_t i = 0; i < k.rozmiar(); ++i)
-    {
-        if (k[i] == '1') licznik++;
-    }
-    return licznik;
-}
-
-
-bool OperacjeNaKostkach::czy_kostka_zawiera(const Kostka& wieksza, const Kostka& mniejsza)
-{
-    if (wieksza.rozmiar() != mniejsza.rozmiar()) return false;
-    for (size_t i = 0; i < wieksza.rozmiar(); ++i)
-    {
-        if (wieksza[i] != '-' && wieksza[i] != mniejsza[i]) return false;
-    }
-    return true;
-}
-
-
-bool OperacjeNaKostkach::czy_implikant_pokrywa_kostke(const Kostka& P, const Kostka& K)
-{
-    const std::size_t n = std::min(P.rozmiar(), K.rozmiar());
-    for (std::size_t i = 0; i < n; ++i)
-    {
-        const char p = P[i];
-        const char k = K[i];
-        if (k == '-') {
-            if (p != '-') return false;
-        } else {
-            if (!(p == '-' || p == k)) return false;
-        }
-    }
-    for (std::size_t i = n; i < P.rozmiar(); ++i) {
-        if (P[i] != '-') return false;
-    }
-    return true;
 }
