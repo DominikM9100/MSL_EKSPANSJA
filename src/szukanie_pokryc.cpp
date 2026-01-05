@@ -85,20 +85,20 @@ std::vector<SzukaniePokryc::PokrycieKolumnowe> SzukaniePokryc::znajdz_wszystkie_
 }
 
 
-bool SzukaniePokryc::czy_pokrywa(const std::vector<std::vector<bool>>& M, const PokrycieKolumnowe& cols)
+bool SzukaniePokryc::czy_pokrywa(const std::vector<std::vector<bool>>& M, const PokrycieKolumnowe& kolumny)
 {
-    const std::size_t rows = M.size();
-    if (rows == 0) return true;
-    for (std::size_t i = 0; i < rows; ++i)
+    const std::size_t wiersze = M.size();
+    if (wiersze == 0) return true;
+    for (std::size_t i = 0; i < wiersze; ++i)
     {
-        bool covered = false;
-        const std::size_t row_len = M[i].size();
-        for (std::size_t k = 0; k < cols.size(); ++k)
+        bool czy_pokryte = false;
+        const std::size_t dlugosc_wiersza = M[i].size();
+        for (std::size_t k = 0; k < kolumny.size(); ++k)
         {
-            std::size_t j = cols[k];
-            if (j < row_len && M[i][j]) { covered = true; break; }
+            std::size_t j = kolumny[k];
+            if (j < dlugosc_wiersza && M[i][j]) { czy_pokryte = true; break; }
         }
-        if (!covered) return false;
+        if (!czy_pokryte) return false;
     }
     return true;
 }

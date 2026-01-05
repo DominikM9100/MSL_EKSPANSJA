@@ -24,7 +24,7 @@ public:
     std::vector<PokrycieKolumnowe> znajdz_wszystkie_minimalne_pokrycia_kolumnowe(const MacierzBlokujaca& B);
 
     // metody dla redukcji tabeli
-    bool czy_pokrywa(const std::vector<std::vector<bool>>& M, const PokrycieKolumnowe& cols);
+    bool czy_pokrywa(const std::vector<std::vector<bool>>& M, const PokrycieKolumnowe& kolumny);
     
     void dfs_minimalne_pokrycia(
         const std::vector<std::vector<bool>>& macierz_zredukowana,
